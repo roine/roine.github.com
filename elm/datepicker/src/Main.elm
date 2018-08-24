@@ -10,15 +10,22 @@ import Time exposing (Month(..), Weekday(..))
 type alias Model =
     { now : Time.Posix
     , here : Time.Zone
-    , firstDayOfWeek : Time.Weekday
     }
+
+
+type alias Config =
+    { firstDayOfWeek : Time.Weekday }
+
+
+config : Config
+config =
+    { firstDayOfWeek = Mon }
 
 
 initialState : Model
 initialState =
     { now = Time.millisToPosix 0
     , here = Time.utc
-    , firstDayOfWeek = Mon
     }
 
 
@@ -149,12 +156,8 @@ millisecondsInDay =
     1000 * 60 * 60 * 24
 
 
-firstDateOfWeek : Time.Weekday -> Time.Zone -> Time.Posix -> Time.Posix
-firstDateOfWeek firstWeekday zone time =
-    let
-        date =
-            toDate zone time
-    in
+firstDateOfWeek_ : Time.Weekday -> Time.Zone -> Time.Posix -> Time.Posix
+firstDateOfWeek_ firstWeekday zone time =
     repeatUntil
         (\newTime ->
             (Time.posixToMillis newTime - millisecondsInDay)
@@ -164,12 +167,51 @@ firstDateOfWeek firstWeekday zone time =
         time
 
 
+firstDateOfWeek : Time.Weekday -> Time.Zone -> Time.Posix -> Time.Posix
+firstDateOfWeek firstWeekday zone time =
+    let
+        cond newTime =
+            firstWeekday == .weekday (toDate zone newTime)
+
+        rec newTime =
+            if cond newTime then
+                newTime
+            else
+                (Time.posixToMillis newTime - millisecondsInDay)
+                    |> Time.millisToPosix
+                    |> rec
+    in
+    rec time
+
+
+dateEq : Time.Zone -> Time.Posix -> Time.Posix -> Bool
+dateEq zone timeA timeB =
+    let
+        dateA =
+            toDate zone timeA
+
+        dateB =
+            toDate zone timeB
+    in
+    ( .day dateA, .month dateA, .year dateA ) == ( .day dateB, .month dateB, .year dateB )
+
+
+datesInRange : Time.Zone -> Time.Posix -> Time.Posix -> List Time.Posix
+datesInRange zone firstDate lastDate =
+    let
+        rec acc newTime =
+            if dateEq zone newTime lastDate then
+                acc
+            else
+                (Time.posixToMillis newTime + millisecondsInDay)
+                    |> Time.millisToPosix
+                    |> (\t -> rec (acc ++ [ t ]) t)
+    in
+    rec [ firstDate ] firstDate
+
+
 lastDateOfWeek : Time.Weekday -> Time.Zone -> Time.Posix -> Time.Posix
 lastDateOfWeek lastWeekday zone time =
-    let
-        date =
-            toDate zone time
-    in
     repeatUntil
         (\newTime ->
             (Time.posixToMillis newTime + millisecondsInDay)
@@ -179,18 +221,32 @@ lastDateOfWeek lastWeekday zone time =
         time
 
 
+repeatUntil_ : (acc -> a -> ( acc, a )) -> (acc -> a -> Bool) -> acc -> a -> acc
+repeatUntil_ fn predicate acc n =
+    let
+        go ac m =
+            if predicate acc m then
+                ac
+            else
+                fn ac m
+                    |> (\( newAcc, newM ) -> go newAcc newM)
+    in
+    go acc n
+
+
 repeatUntil : (a -> a) -> (a -> Bool) -> a -> a
-repeatUntil f predicate n =
+repeatUntil fn predicate n =
     let
         go m =
             if predicate m then
                 m
             else
-                go (f m)
+                go (fn m)
     in
     go n
 
 
+previousWeekday : Time.Weekday -> Time.Weekday
 previousWeekday weekday =
     case weekday of
         Mon ->
@@ -236,8 +292,20 @@ view model =
         , div []
             [ text ("last day" ++ Debug.toString (toDate model.here lastDayOfMonth))
             ]
-        , div [] [ text (Debug.toString (toDate model.here (firstDateOfWeek model.firstDayOfWeek model.here firstDayOfMonth))) ]
-        , div [] [ text (Debug.toString (toDate model.here (lastDateOfWeek (previousWeekday model.firstDayOfWeek) model.here lastDayOfMonth))) ]
+        , div [] [ text (Debug.toString (toDate model.here (firstDateOfWeek config.firstDayOfWeek model.here firstDayOfMonth))) ]
+        , div [] [ text (Debug.toString (toDate model.here (lastDateOfWeek (previousWeekday config.firstDayOfWeek) model.here lastDayOfMonth))) ]
+        , div []
+            [ text
+                (Debug.toString
+                    (List.map
+                        (\t -> .day (toDate model.here t))
+                        (datesInRange model.here
+                            (firstDateOfWeek config.firstDayOfWeek model.here firstDayOfMonth)
+                            (lastDateOfWeek (previousWeekday config.firstDayOfWeek) model.here lastDayOfMonth)
+                        )
+                    )
+                )
+            ]
         ]
 
 

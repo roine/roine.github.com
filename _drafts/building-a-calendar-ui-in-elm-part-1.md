@@ -91,9 +91,9 @@ millisecondsInDay =
 changeDay 1 model.here model.now
 ```
 Let's get the last day of the month now. We could use the `changeDay` function but we don't know how many days are in the current month.
-We'll need to create a function `daysInMonth : Int -> Month -> Int` which will take a year and month return a number of days. Nothing fancy, just mapping 
-the month to the number of days, the only challenge will be to return the right amount for the month of `February` 
-(accounting for leap year). 
+We'll need to create a function `daysInMonth : Int -> Month -> Int` which will take a year and month return a number of days. 
+Nothing fancy, just mapping the month to the number of days, the only challenge will be to return the right amount for 
+the month of `February` (accounting for leap year). 
 
 I will just share the `isLeapYear : Year -> Bool` function, where `Year` is an `Int`.
 ```haskell
@@ -106,8 +106,88 @@ This code was copied from [elm-community/elm-time][1].
 Then we'll just need to call `changeDay (daysInMonth date.year date.month) date` to get the last date of the current month.
 
 ## Get the first and last date of the calendar grid
-The visual calendar will have need 
-
+The calendar is going to be grid of 7 columns and a variable amount of rows. Eg:
 <center><img src="{{ "assets/elm/datepicker/screenshot_1.png" | absolute_url }}" alt="Typical calendar view" width="250"/></center>
+At the moment we've got the first (Wed 1 Aug 2018) and the last day (Fri 31 2018) of the month. We'll need to extend these dates
+to reach the first and last day of the week. 
+
+But what should be the first and last days of the week? Here is what Wikipedia says:
+<center>
+    <img src="{{ "assets/elm/datepicker/screenshot_2.png" | absolute_url }}" alt="First Day of week according to Wikipedia" width="250"/>
+</center>
+
+
+We're going to need to have the first day of the week configurable.
+```haskell
+type alias Config =
+    { firstDayOfWeek : Time.Weekday }
+
+
+config : Config
+config =
+    { firstDayOfWeek = Mon }
+```
+From there we should be able to get the last day of the week with a simple mapping function, 
+`previousWeekday: Time.Weekday -> Time.Weekday`.
+
+Right, so how do we go from the first day of the month to the first date of the calendar (Mon 30 Aug 2018)
+(I wont go over how to get the last date of the calendar since it's a very similar technique)?
+
+Let's go over the principle first and we'll see the implementation after.
+
+We start with our first date of the month then we want to subtract a day until we reach the first date of the calendar. Eg:
+- Wed 1 Aug 2018
+    - is it Mon? No
+- Tue 31 Jul 2018
+    - is it Mon? No
+- Mon 30 Jul 2018
+    - is it Mon? Yes. Stop
+    
+Let's see the implementation:
+```haskell
+firstDateOfWeek : Time.Weekday -> Time.Zone -> Time.Posix -> Time.Posix
+firstDateOfWeek firstWeekday zone time =
+    let
+        cond newTime =
+            firstWeekday == .weekday (toDate zone newTime)
+
+        rec newTime =
+            if cond newTime then
+                newTime
+            else
+                (Time.posixToMillis newTime - millisecondsInDay)
+                    |> Time.millisToPosix
+                    |> rec
+    in
+    rec time
+```
+We now got the first and last date of the calendar. We'll use the same technique as before but with an accumulator.
+```haskell
+dateEq : Time.Zone -> Time.Posix -> Time.Posix -> Bool
+dateEq zone timeA timeB =
+    let
+        dateA =
+            toDate zone timeA
+
+        dateB =
+            toDate zone timeB
+    in
+    ( .day dateA, .month dateA, .year dateA ) == ( .day dateB, .month dateB, .year dateB )
+
+
+datesInRange : Time.Zone -> Time.Posix -> Time.Posix -> List Time.Posix
+datesInRange zone firstDate lastDate =
+    let
+        rec acc newTime =
+            if dateEq zone newTime lastDate then
+                acc
+            else
+                (Time.posixToMillis newTime + millisecondsInDay)
+                    |> Time.millisToPosix
+                    |> (\t -> rec (acc ++ [ t ]) t)
+    in
+    rec [ firstDate ] firstDate
+```
 
 [1]: https://github.com/elm-community/elm-time/blob/master/src/Time/Date.elm#L478
+[2]: google.fr
