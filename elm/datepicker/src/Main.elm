@@ -286,27 +286,38 @@ view model =
 
         lastDayOfMonth =
             changeDay (daysInMonth date.year date.month) model.here model.now
+
+        firstDateOfCal =
+            firstDateOfWeek config.firstDayOfWeek model.here firstDayOfMonth
+
+        lastDateOfCal =
+            lastDateOfWeek (previousWeekday config.firstDayOfWeek) model.here lastDayOfMonth
     in
     div []
-        [ div [] [ text ("first day" ++ Debug.toString (toDate model.here firstDayOfMonth)) ]
+        [ div [] [ text ("First date of the Month" ++ Debug.toString (toDate model.here firstDayOfMonth)) ]
         , div []
-            [ text ("last day" ++ Debug.toString (toDate model.here lastDayOfMonth))
+            [ text ("Last date of the Month" ++ Debug.toString (toDate model.here lastDayOfMonth))
             ]
-        , div [] [ text (Debug.toString (toDate model.here (firstDateOfWeek config.firstDayOfWeek model.here firstDayOfMonth))) ]
-        , div [] [ text (Debug.toString (toDate model.here (lastDateOfWeek (previousWeekday config.firstDayOfWeek) model.here lastDayOfMonth))) ]
+        , div [] [ text ("First date of Calendar: " ++ Debug.toString (toDate model.here firstDateOfCal)) ]
+        , div [] [ text ("Last date of Calendar: " ++ Debug.toString (toDate model.here lastDateOfCal)) ]
         , div []
             [ text
                 (Debug.toString
                     (List.map
-                        (\t -> .day (toDate model.here t))
-                        (datesInRange model.here
-                            (firstDateOfWeek config.firstDayOfWeek model.here firstDayOfMonth)
-                            (lastDateOfWeek (previousWeekday config.firstDayOfWeek) model.here lastDayOfMonth)
-                        )
+                        (dateToString model.here)
+                        (datesInRange model.here firstDateOfCal lastDateOfCal)
                     )
                 )
             ]
         ]
+
+
+dateToString zone time =
+    let
+        date =
+            toDate zone time
+    in
+    Debug.toString date.weekday ++ " " ++ Debug.toString date.day ++ " " ++ Debug.toString date.month
 
 
 

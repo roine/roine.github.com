@@ -189,5 +189,10 @@ datesInRange zone firstDate lastDate =
     rec [ firstDate ] firstDate
 ```
 
+That's it for now! We've got all the days in the calendar. In the next part we'll use this list to render the calendar's grid.
+
+Here's the [result in a page][2], and [here is the code][3].
+
 [1]: https://github.com/elm-community/elm-time/blob/master/src/Time/Date.elm#L478
-[2]: google.fr
+[2]: /elm/datepicker/index_1.html
+[3]: https://github.com/roine/roine.github.com/blob/elm-datepicker-part1/elm/datepicker/src/Main.elm
