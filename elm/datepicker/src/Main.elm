@@ -1,7 +1,7 @@
 module Main exposing (..)
 
 import Browser
-import Html exposing (Html, button, div, option, select, span, table, tbody, td, text, thead, tr)
+import Html exposing (Html, button, div, option, select, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Task
@@ -284,6 +284,43 @@ previousWeekday weekday =
             Sat
 
 
+weekDayToString : Weekday -> String
+weekDayToString weekday =
+    case weekday of
+        Mon ->
+            "Mo"
+
+        Tue ->
+            "Tu"
+
+        Wed ->
+            "We"
+
+        Thu ->
+            "Th"
+
+        Fri ->
+            "Fr"
+
+        Sat ->
+            "Sa"
+
+        Sun ->
+            "Su"
+
+
+getDaysOfTheWeek : Weekday -> List Weekday
+getDaysOfTheWeek firstDay =
+    let
+        rec currentDay acc =
+            if List.length acc == 7 then
+                acc
+            else
+                rec (previousWeekday currentDay) (currentDay :: acc)
+    in
+    rec (previousWeekday firstDay) []
+
+
 listGrouping : Int -> List a -> List (List a)
 listGrouping width elements =
     let
@@ -329,7 +366,15 @@ view model =
             [ style "border-collapse" "collapse"
             , style "border-spacing" "0"
             ]
-            [ thead [] [ tr [] [] ]
+            [ thead []
+                [ tr []
+                    (List.map
+                        (\day ->
+                            th [] [ text (weekDayToString day) ]
+                        )
+                        (getDaysOfTheWeek model.config.firstDayOfWeek)
+                    )
+                ]
             , tbody []
                 (List.map
                     (\row ->
