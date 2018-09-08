@@ -12,6 +12,7 @@ type alias Model =
     { now : Time.Posix
     , here : Time.Zone
     , config : Config
+    , currentDateView : Time.Posix
     }
 
 
@@ -29,6 +30,7 @@ initialModel =
     { now = Time.millisToPosix 0
     , here = Time.utc
     , config = config
+    , currentDateView = Time.millisToPosix 0
     }
 
 
@@ -116,6 +118,46 @@ daysInMonth y m =
             31
 
 
+monthToString : Month -> String
+monthToString month =
+    case month of
+        Jan ->
+            "January"
+
+        Feb ->
+            "February"
+
+        Mar ->
+            "March"
+
+        Apr ->
+            "April"
+
+        May ->
+            "May"
+
+        Jun ->
+            "June"
+
+        Jul ->
+            "July"
+
+        Aug ->
+            "August"
+
+        Sep ->
+            "September"
+
+        Oct ->
+            "October"
+
+        Nov ->
+            "November"
+
+        Dec ->
+            "December"
+
+
 isLeapYear : Int -> Bool
 isLeapYear y =
     modBy y 400 == 0 || modBy y 100 /= 0 && modBy y 4 == 0
@@ -128,6 +170,8 @@ isLeapYear y =
 type Msg
     = NewTime ( Time.Zone, Time.Posix )
     | ChangeFirstDay Time.Weekday
+    | PrevMonth
+    | NextMonth
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -138,7 +182,7 @@ update msg model =
     in
     case msg of
         NewTime ( zone, time ) ->
-            ( { model | here = zone, now = time }
+            ( { model | here = zone, now = time, currentDateView = time }
             , Cmd.none
             )
 
@@ -146,6 +190,12 @@ update msg model =
             ( { model | config = { config_ | firstDayOfWeek = newFirstDay } }
             , Cmd.none
             )
+
+        PrevMonth ->
+            ( { model | currentDateView = addMonths -1 model.here model.currentDateView }, Cmd.none )
+
+        NextMonth ->
+            ( { model | currentDateView = addMonths 1 model.here model.currentDateView }, Cmd.none )
 
 
 changeDay : Int -> Time.Zone -> Time.Posix -> Time.Posix
@@ -162,6 +212,30 @@ changeDay day zone time =
     in
     (Time.posixToMillis date.posix + dayDiffInMillis)
         |> Time.millisToPosix
+
+
+addDays : Int -> Time.Posix -> Time.Posix
+addDays days time =
+    (Time.posixToMillis time
+        + days
+        * 24
+        * 60
+        * 60
+        * 1000
+    )
+        |> Time.millisToPosix
+
+
+
+--changeMonth : Int -> Time.Zone -> Time.Posix -> Time.Posix
+
+
+addMonths month zone time =
+    let
+        date =
+            toDate zone time
+    in
+    addDays (daysInMonth date.year date.month * month) time
 
 
 millisecondsInDay : Int
@@ -232,19 +306,6 @@ lastDateOfWeek lastWeekday zone time =
         )
         ((==) lastWeekday << .weekday << toDate zone)
         time
-
-
-repeatUntil_ : (acc -> a -> ( acc, a )) -> (acc -> a -> Bool) -> acc -> a -> acc
-repeatUntil_ fn predicate acc n =
-    let
-        go ac m =
-            if predicate acc m then
-                ac
-            else
-                fn ac m
-                    |> (\( newAcc, newM ) -> go newAcc newM)
-    in
-    go acc n
 
 
 repeatUntil : (a -> a) -> (a -> Bool) -> a -> a
@@ -346,13 +407,13 @@ view : Model -> Html Msg
 view model =
     let
         date =
-            toDate model.here model.now
+            toDate model.here model.currentDateView
 
         firstDayOfMonth =
-            changeDay 1 model.here model.now
+            changeDay 1 model.here model.currentDateView
 
         lastDayOfMonth =
-            changeDay (daysInMonth date.year date.month) model.here model.now
+            changeDay (daysInMonth date.year date.month) model.here model.currentDateView
 
         calendarData =
             listGrouping 7
@@ -361,10 +422,29 @@ view model =
                     (lastDateOfWeek (previousWeekday model.config.firstDayOfWeek) model.here lastDayOfMonth)
                 )
     in
-    div []
-        [ table
+    div [ style "width" "350px" ]
+        [ div [ style "display" "flex" ]
+            [ div
+                [ style "flex" "1"
+                , style "text-align" "left"
+                ]
+                [ button [ onClick PrevMonth ] [ text "Prev" ] ]
+            , div
+                [ style "flex" "2"
+                , style "text-align" "center"
+                ]
+                [ text (monthToString date.month ++ " " ++ String.fromInt date.year) ]
+            , div
+                [ style "flex" "1"
+                , style "text-align" "right"
+                ]
+                [ button [ onClick NextMonth ] [ text "Next" ] ]
+            ]
+        , table
             [ style "border-collapse" "collapse"
             , style "border-spacing" "0"
+            , style "width" "100%"
+            , style "table-layout" "fixed"
             ]
             [ thead []
                 [ tr []
@@ -387,7 +467,7 @@ view model =
                                             , style "width" "100%"
                                             , style "background" "none"
                                             , style "border" "0"
-                                            , style "padding" "15px"
+                                            , style "padding" "10px 0"
                                             ]
                                             [ .day (toDate model.here cellDate)
                                                 |> String.fromInt
@@ -401,7 +481,14 @@ view model =
                     calendarData
                 )
             ]
-        , select [] (List.map (\( weekdayStr, weekday ) -> option [ onClick (ChangeFirstDay weekday) ] [ text weekdayStr ]) weekdayList)
+        , text "First day of the week"
+        , select []
+            (List.map
+                (\( weekdayStr, weekday ) ->
+                    option [ onClick (ChangeFirstDay weekday) ] [ text weekdayStr ]
+                )
+                weekdayList
+            )
         ]
 
 
