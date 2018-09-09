@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Browser
+import Extra.Time exposing (..)
 import Html exposing (Html, button, div, option, select, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
@@ -46,123 +47,6 @@ init flags =
     )
 
 
-type alias Date =
-    { year : Int
-    , month : Time.Month
-    , day : Int
-    , weekday : Time.Weekday
-    , hour : Int
-    , minute : Int
-    , seconds : Int
-    , milliseconds : Int
-    , posix : Time.Posix
-    , zone : Time.Zone
-    }
-
-
-toDate : Time.Zone -> Time.Posix -> Date
-toDate zone time =
-    { year = Time.toYear zone time
-    , month = Time.toMonth zone time
-    , day = Time.toDay zone time
-    , weekday = Time.toWeekday zone time
-    , hour = Time.toHour zone time
-    , minute = Time.toMinute zone time
-    , seconds = Time.toSecond zone time
-    , milliseconds = Time.toMillis zone time
-    , posix = time
-    , zone = zone
-    }
-
-
-daysInMonth : Int -> Month -> Int
-daysInMonth y m =
-    case m of
-        Jan ->
-            31
-
-        Feb ->
-            if isLeapYear y then
-                29
-            else
-                28
-
-        Mar ->
-            31
-
-        Apr ->
-            30
-
-        May ->
-            31
-
-        Jun ->
-            30
-
-        Jul ->
-            31
-
-        Aug ->
-            31
-
-        Sep ->
-            30
-
-        Oct ->
-            31
-
-        Nov ->
-            30
-
-        Dec ->
-            31
-
-
-monthToString : Month -> String
-monthToString month =
-    case month of
-        Jan ->
-            "January"
-
-        Feb ->
-            "February"
-
-        Mar ->
-            "March"
-
-        Apr ->
-            "April"
-
-        May ->
-            "May"
-
-        Jun ->
-            "June"
-
-        Jul ->
-            "July"
-
-        Aug ->
-            "August"
-
-        Sep ->
-            "September"
-
-        Oct ->
-            "October"
-
-        Nov ->
-            "November"
-
-        Dec ->
-            "December"
-
-
-isLeapYear : Int -> Bool
-isLeapYear y =
-    modBy y 400 == 0 || modBy y 100 /= 0 && modBy y 4 == 0
-
-
 
 -- UPDATE
 
@@ -201,7 +85,7 @@ update msg model =
 changeDay : Int -> Time.Zone -> Time.Posix -> Time.Posix
 changeDay day zone time =
     let
-        date =
+        (Date date) =
             toDate zone time
 
         dayDiff =
@@ -226,13 +110,10 @@ addDays days time =
         |> Time.millisToPosix
 
 
-
---changeMonth : Int -> Time.Zone -> Time.Posix -> Time.Posix
-
-
+addMonths : Int -> Time.Zone -> Time.Posix -> Time.Posix
 addMonths month zone time =
     let
-        date =
+        (Date date) =
             toDate zone time
     in
     addDays (daysInMonth date.year date.month * month) time
@@ -243,22 +124,11 @@ millisecondsInDay =
     1000 * 60 * 60 * 24
 
 
-firstDateOfWeek_ : Time.Weekday -> Time.Zone -> Time.Posix -> Time.Posix
-firstDateOfWeek_ firstWeekday zone time =
-    repeatUntil
-        (\newTime ->
-            (Time.posixToMillis newTime - millisecondsInDay)
-                |> Time.millisToPosix
-        )
-        ((==) firstWeekday << .weekday << toDate zone)
-        time
-
-
 firstDateOfWeek : Time.Weekday -> Time.Zone -> Time.Posix -> Time.Posix
 firstDateOfWeek firstWeekday zone time =
     let
         cond newTime =
-            firstWeekday == .weekday (toDate zone newTime)
+            firstWeekday == toWeekday (toDate zone newTime)
 
         rec newTime =
             if cond newTime then
@@ -274,10 +144,10 @@ firstDateOfWeek firstWeekday zone time =
 dateEq : Time.Zone -> Time.Posix -> Time.Posix -> Bool
 dateEq zone timeA timeB =
     let
-        dateA =
+        (Date dateA) =
             toDate zone timeA
 
-        dateB =
+        (Date dateB) =
             toDate zone timeB
     in
     ( .day dateA, .month dateA, .year dateA ) == ( .day dateB, .month dateB, .year dateB )
@@ -304,7 +174,7 @@ lastDateOfWeek lastWeekday zone time =
             (Time.posixToMillis newTime + millisecondsInDay)
                 |> Time.millisToPosix
         )
-        ((==) lastWeekday << .weekday << toDate zone)
+        ((==) lastWeekday << toWeekday << toDate zone)
         time
 
 
@@ -318,56 +188,6 @@ repeatUntil fn predicate n =
                 go (fn m)
     in
     go n
-
-
-previousWeekday : Time.Weekday -> Time.Weekday
-previousWeekday weekday =
-    case weekday of
-        Mon ->
-            Sun
-
-        Tue ->
-            Mon
-
-        Wed ->
-            Tue
-
-        Thu ->
-            Wed
-
-        Fri ->
-            Thu
-
-        Sat ->
-            Fri
-
-        Sun ->
-            Sat
-
-
-weekDayToString : Weekday -> String
-weekDayToString weekday =
-    case weekday of
-        Mon ->
-            "Mo"
-
-        Tue ->
-            "Tu"
-
-        Wed ->
-            "We"
-
-        Thu ->
-            "Th"
-
-        Fri ->
-            "Fr"
-
-        Sat ->
-            "Sa"
-
-        Sun ->
-            "Su"
 
 
 getDaysOfTheWeek : Weekday -> List Weekday
@@ -406,7 +226,7 @@ listGrouping width elements =
 view : Model -> Html Msg
 view model =
     let
-        date =
+        (Date date) =
             toDate model.here model.currentDateView
 
         firstDayOfMonth =
@@ -469,7 +289,7 @@ view model =
                                             , style "border" "0"
                                             , style "padding" "10px 0"
                                             ]
-                                            [ .day (toDate model.here cellDate)
+                                            [ toDay (toDate model.here cellDate)
                                                 |> String.fromInt
                                                 |> text
                                             ]
@@ -492,17 +312,9 @@ view model =
         ]
 
 
+weekdayList : List ( String, Weekday )
 weekdayList =
     [ ( "Mon", Mon ), ( "Tue", Tue ), ( "Wed", Wed ), ( "Thu", Thu ), ( "Fri", Fri ), ( "Sat", Sat ), ( "Sun", Sun ) ]
-
-
-dateToString : Time.Zone -> Time.Posix -> String
-dateToString zone time =
-    let
-        date =
-            toDate zone time
-    in
-    Debug.toString date.weekday ++ " " ++ Debug.toString date.day ++ " " ++ Debug.toString date.month
 
 
 
